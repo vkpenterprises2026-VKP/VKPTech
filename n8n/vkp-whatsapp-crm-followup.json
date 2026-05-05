@@ -1,0 +1,94 @@
+{
+  "name": "VKP WhatsApp CRM Follow-up",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "vkp-whatsapp-lead",
+        "responseMode": "responseNode"
+      },
+      "id": "Webhook_Lead",
+      "name": "Website / WhatsApp Lead",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.VKP_API_BASE}}/api/leads",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "name", "value": "={{$json.name || 'WhatsApp Lead'}}" },
+            { "name": "phone", "value": "={{$json.phone || $json.from}}" },
+            { "name": "email", "value": "={{$json.email || ''}}" },
+            { "name": "interest", "value": "={{$json.interest || 'Catalogue'}}" },
+            { "name": "message", "value": "={{$json.message || $json.text || ''}}" }
+          ]
+        }
+      },
+      "id": "Save_CRM",
+      "name": "Save Lead in CRM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [240, 0]
+    },
+    {
+      "parameters": {
+        "amount": 10,
+        "unit": "minutes"
+      },
+      "id": "Wait_10_Minutes",
+      "name": "Wait 10 Minutes",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [480, 0],
+      "webhookId": "vkp-followup-wait"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v20.0/{{$env.WHATSAPP_PHONE_NUMBER_ID}}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"messaging_product\":\"whatsapp\",\"recipient_type\":\"individual\",\"to\":\"{{$json.phone || $json.from}}\",\"type\":\"text\",\"text\":{\"preview_url\":false,\"body\":\"Hi, this is VKP Technologies following up on your enquiry. Please share your requirement details to get a GST quotation.\"}}"
+      },
+      "id": "WhatsApp_Followup",
+      "name": "WhatsApp Follow-up",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [720, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"ok\":true}"
+      },
+      "id": "Response",
+      "name": "Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [960, 0]
+    }
+  ],
+  "connections": {
+    "Website / WhatsApp Lead": {
+      "main": [[{ "node": "Save Lead in CRM", "type": "main", "index": 0 }]]
+    },
+    "Save Lead in CRM": {
+      "main": [[{ "node": "Wait 10 Minutes", "type": "main", "index": 0 }]]
+    },
+    "Wait 10 Minutes": {
+      "main": [[{ "node": "WhatsApp Follow-up", "type": "main", "index": 0 }]]
+    },
+    "WhatsApp Follow-up": {
+      "main": [[{ "node": "Response", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

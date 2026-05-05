@@ -1,0 +1,59 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userRole() {
+      return signedIn()
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+        : "guest";
+    }
+
+    function approved() {
+      return signedIn()
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.approved == true;
+    }
+
+    function admin() {
+      return approved() && userRole() == "admin";
+    }
+
+    function staff() {
+      return approved() && (userRole() == "admin" || userRole() == "staff");
+    }
+
+    function dealer() {
+      return approved() && userRole() == "dealer";
+    }
+
+    match /products/{productId} {
+      allow read: if true;
+      allow create, update, delete: if staff();
+    }
+
+    match /orders/{orderId} {
+      allow read: if staff() || dealer();
+      allow create: if signedIn();
+      allow update, delete: if staff();
+    }
+
+    match /transactions/{transactionId} {
+      allow read: if admin();
+      allow write: if false;
+    }
+
+    match /leads/{leadId} {
+      allow create: if true;
+      allow read, update, delete: if staff();
+    }
+
+    match /users/{userId} {
+      allow read: if signedIn() && (request.auth.uid == userId || admin());
+      allow create: if signedIn() && request.auth.uid == userId;
+      allow update: if admin() || (request.auth.uid == userId && !("role" in request.resource.data.diff(resource.data).changedKeys()));
+      allow delete: if admin();
+    }
+  }
+}
